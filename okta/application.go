@@ -19,6 +19,7 @@
 package okta
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/okta/okta-sdk-golang/okta/query"
 	"time"
@@ -101,6 +102,8 @@ func (m *ApplicationResource) DeleteApplication(appId string) (*Response, error)
 	}
 	return resp, nil
 }
+
+//TODO: User a generic for the application type that allows type assertion and re-casting
 func (m *ApplicationResource) ListApplications(qp *query.Params) ([]App, *Response, error) {
 	url := fmt.Sprintf("/api/v1/apps")
 	if qp != nil {
@@ -111,12 +114,47 @@ func (m *ApplicationResource) ListApplications(qp *query.Params) ([]App, *Respon
 		return nil, nil, err
 	}
 
-	var application []App
+	// use map[string]interface{} then marshal and unmarshal based on Type?
+	var application []map[string]interface{}
 	resp, err := m.client.requestExecutor.Do(req, &application)
 	if err != nil {
 		return nil, resp, err
 	}
-	return application, resp, nil
+	typedApps := make([]App, len(application))
+	for i, app := range application {
+		body, err := json.Marshal(app)
+		if err != nil {
+			return nil, resp, err
+		}
+
+		var newApp App
+		switch mode := app["signOnMode"]; mode {
+		case "SAML_2_0":
+			newApp = NewSamlApplication()
+		case "BOOKMARK":
+			newApp = NewBookmarkApplication()
+		case "BASIC_AUTH":
+			newApp = NewBasicAuthApplication()
+		case "BROWSER_PLUGIN":
+			newApp = NewBrowserPluginApplication()
+		case "SECURE_PASSWORD_STORE":
+			newApp = NewSecurePasswordStoreApplication()
+		case "WS_FEDERATION":
+			newApp = NewWsFederationApplication()
+		case "AUTO_LOGIN":
+			newApp = NewAutoLoginApplication()
+		case "OPENID_CONNECT":
+			//TODO: fix grant_type Unmarshal issue
+			newApp = NewApplication()
+		}
+
+		err = json.Unmarshal(body, &newApp)
+		if err != nil {
+			return nil, resp, err
+		}
+		typedApps[i] = newApp
+	}
+	return typedApps, resp, nil
 }
 func (m *ApplicationResource) CreateApplication(body App, qp *query.Params) (interface{}, *Response, error) {
 	url := fmt.Sprintf("/api/v1/apps")
