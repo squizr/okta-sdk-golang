@@ -145,7 +145,7 @@ func (m *ApplicationResource) ListApplications(qp *query.Params) ([]App, *Respon
 			newApp = NewAutoLoginApplication()
 		case "OPENID_CONNECT":
 			//TODO: fix grant_type Unmarshal issue
-			newApp = NewApplication()
+			newApp = NewOpenIdConnectApplication()
 		}
 
 		err = json.Unmarshal(body, &newApp)
